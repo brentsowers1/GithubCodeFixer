@@ -1,0 +1,10 @@
+*.com
+*.class
+*.log
+.idea
+lib_managed
+target
+project/build/target
+project/boot
+*.iml
+
