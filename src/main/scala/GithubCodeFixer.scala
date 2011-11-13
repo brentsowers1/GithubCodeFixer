@@ -11,5 +11,11 @@ object GithubCodeFixer {
             println("Forks:       " + repo.forks)
             println("Size:        " + repo.size + "\n")
         }
+
+        val watchers = gh.repoWatchers("rails", "rails")
+        for (watcher <- watchers) {
+            println("Watcher login: " + watcher.login)
+        }
+        println("")
     }
 }

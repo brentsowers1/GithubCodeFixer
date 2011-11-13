@@ -5,6 +5,8 @@
 import dispatch._
 import net.liftweb.json._
 
+class GithubClass
+
 /**
  * A github user
  */
@@ -12,6 +14,7 @@ case class User(login: String,        // login name of hte user
                 id: Int,              // numeric github ID
                 avatar_url: String,   // URL to their avatar pic
                 url: String)          // API url to retrieve JSON of the user
+    extends GithubClass
 
 /**
  * A single code repo.
@@ -35,6 +38,7 @@ case class Repo(url: String,                // URL to get JSON for this repo via
                 open_issues: Int,           // number of open issues?
                 pushed_at: java.util.Date,  // last time repo was pushed to
                 created_at: java.util.Date) // when the repo was created
+    extends GithubClass
 
 class GithubApi {
     private var username : String = ""
@@ -51,31 +55,44 @@ class GithubApi {
      * Response is a list of Repo objects as specified the case class above
      */
     def reposByUser(user: String) : List[Repo] = {
-        val rspJVal = makeRequest("users/" + user + "/repos")
-        // Github response is an array of objects, this will get that array
-        // as a List
-        val rspList = rspJVal.children
-        for (msg <- rspList) yield msg.extract[Repo]
+        getData[Repo]("users/" + user + "/repos")
+    }
+
+    def repoWatchers(repoOwner: String,  repoName: String) : List[User] = {
+        getData[User]("repos/" + repoOwner + "/" + repoName + "/watchers")
     }
 
     /**
      * Makes an HTTP request to Github, and returns the response as a JValue.
      * Individual functions should parse the JValue as needed
      */
-    private def makeRequest(path: String) : JValue = {
+    private def getData[T <: GithubClass : Manifest](path: String,  responseIsArray: Boolean = true,
+                                          previousResults: List[T] = List()) : List[T] = {
         val h = new Http
         val req = url(baseUrl + "/" + path)
+        var checkForMore = true
 
         // Gets both the headers and response body
         val rspStr = h(req >:+ { (headers, req) =>
-            // Not doing anything with the headers yet, we'll want to check
-            // these for the rate limits, and if we're close the rate limit,
-            // sleep for a little while. We'll also need to check if we've
-            // hit the rate limit, and try again.
-            val asdf = headers
+            val hdrs = headers
+            checkForMore = false
             req as_str
         })
-        parse(rspStr)
+        val rspJVal = parse(rspStr)
+        var results : List[T] = List()
+        if (responseIsArray) {
+            val rspList = rspJVal.children
+            results = (for (userJObj <- rspList) yield userJObj.extract[T])
+        } else {
+            results = List(rspJVal.extract[T])
+        }
+        val allResults = previousResults ::: results
+        if (checkForMore) {
+            getData(path, responseIsArray, allResults)
+        } else {
+            allResults
+        }
     }
+
 
 }
