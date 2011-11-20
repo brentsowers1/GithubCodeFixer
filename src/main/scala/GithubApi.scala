@@ -8,8 +8,8 @@ import net.liftweb.json._
 class GithubClass
 
 /**
- * A github user
- */
+* A github user
+*/
 case class User(login: String,        // login name of hte user
                 id: Int,              // numeric github ID
                 avatar_url: String,   // URL to their avatar pic
@@ -17,8 +17,8 @@ case class User(login: String,        // login name of hte user
     extends GithubClass
 
 /**
- * A single code repo.
- */
+* A single code repo.
+*/
 case class Repo(url: String,                // URL to get JSON for this repo via the API
                 html_url: String,           // web page for this repo
                 clone_url: String,          // HTTP clone URL
@@ -63,36 +63,48 @@ class GithubApi {
     }
 
     /**
-     * Makes an HTTP request to Github, and returns the response as a JValue.
-     * Individual functions should parse the JValue as needed
+     * Makes an HTTP request to Github, and returns a list of the type passed in
      */
     private def getData[T <: GithubClass : Manifest](path: String,  responseIsArray: Boolean = true,
-                                          previousResults: List[T] = List()) : List[T] = {
+                                          previousResults: List[T] = List(), pageNum: Int = 1,
+                                          maxPages: Int = 1) : List[T] = {
         val h = new Http
-        val req = url(baseUrl + "/" + path)
-        var checkForMore = true
+        var strUrl = baseUrl + "/" + path
+        if (pageNum > 1) {
+            strUrl = strUrl + "?page=" + pageNum.toString()
+        }
+        val req = url(strUrl)
+        var maxPagesVar = maxPages
 
         // Gets both the headers and response body
         val rspStr = h(req >:+ { (headers, req) =>
-            val hdrs = headers
-            checkForMore = false
+            // The first time we run this, look at the headers for what the last
+            // page is.
+            if (pageNum == 1) {
+                if (headers.contains("link") && headers("link").length > 0) {
+                    val NextLinkPattern = """.*\?page=(\d+)>; rel="next", .*?page=(\d+)>; rel="last".*""".r
+                    headers("link").head match {
+                        case NextLinkPattern(next, last) => maxPagesVar = last.toInt
+                        case _ => {}
+                    }
+                }
+            }
             req as_str
         })
         val rspJVal = parse(rspStr)
         var results : List[T] = List()
         if (responseIsArray) {
             val rspList = rspJVal.children
-            results = (for (userJObj <- rspList) yield userJObj.extract[T])
+            results = (for (jObj <- rspList) yield jObj.extract[T])
         } else {
             results = List(rspJVal.extract[T])
         }
         val allResults = previousResults ::: results
-        if (checkForMore) {
-            getData(path, responseIsArray, allResults)
+        if (maxPagesVar > 1 && pageNum < maxPagesVar) {
+            getData(path, responseIsArray, allResults, pageNum + 1, maxPagesVar)
         } else {
             allResults
         }
     }
-
 
 }
