@@ -4,6 +4,7 @@
 
 import dispatch._
 import net.liftweb.json._
+import scala.actors.Actor._
 
 class GithubClass
 
@@ -65,46 +66,70 @@ class GithubApi {
     /**
      * Makes an HTTP request to Github, and returns a list of the type passed in
      */
-    private def getData[T <: GithubClass : Manifest](path: String,  responseIsArray: Boolean = true,
-                                          previousResults: List[T] = List(), pageNum: Int = 1,
-                                          maxPages: Int = 1) : List[T] = {
+    private def getData[T <: GithubClass : Manifest](path: String,
+                                                     responseIsArray: Boolean = true) : List[T] = {
         val h = new Http
         var strUrl = baseUrl + "/" + path
-        if (pageNum > 1) {
-            strUrl = strUrl + "?page=" + pageNum.toString()
-        }
         val req = url(strUrl)
-        var maxPagesVar = maxPages
+        var maxPage = 1
+        val caller = self
 
-        // Gets both the headers and response body
+        // To know if there are multiple pages, we have to make the first request
         val rspStr = h(req >:+ { (headers, req) =>
             // The first time we run this, look at the headers for what the last
             // page is.
-            if (pageNum == 1) {
-                if (headers.contains("link") && headers("link").length > 0) {
-                    val NextLinkPattern = """.*\?page=(\d+)>; rel="next", .*?page=(\d+)>; rel="last".*""".r
-                    headers("link").head match {
-                        case NextLinkPattern(next, last) => maxPagesVar = last.toInt
-                        case _ => {}
-                    }
+            if (headers.contains("link") && headers("link").length > 0) {
+                val NextLinkPattern = """.*\?page=(\d+)>; rel="next", .*?page=(\d+)>; rel="last".*""".r
+                headers("link").head match {
+                    case NextLinkPattern(next, last) => maxPage = last.toInt
+                    case _ => {}
                 }
             }
             req as_str
         })
-        val rspJVal = parse(rspStr)
+        h.shutdown()
+        var results = parseResults[T](rspStr, responseIsArray)
+        if (responseIsArray && maxPage > 1) {
+            for(i <- 2 until maxPage) {
+                actor {
+                    caller ! getSinglePage[T](path, i)
+                }
+            }
+            for(i <- 2 until maxPage) {
+                receive {
+                    case pageResults: List[T] => {
+                        results = results ::: pageResults
+                    }
+                }
+            }
+        }
+        results
+    }
+
+    private def getSinglePage[T <: GithubClass : Manifest](path: String, pageNum: Int = 1) : List[T] = {
+        val h = new Http
+        var strUrl = baseUrl + "/" + path + "?page=" + pageNum.toString
+        val req = url(strUrl)
+
+        // Gets both the headers and response body
+        val rspStr = h(req >:+ { (headers, req) =>
+            req as_str
+        })
+        h.shutdown()
+        parseResults[T](rspStr)
+    }
+
+    private def parseResults[T <: GithubClass : Manifest](resultData: String,
+                                                          responseIsArray: Boolean = true) : List[T] = {
+        val rspJVal = parse(resultData)
         var results : List[T] = List()
         if (responseIsArray) {
             val rspList = rspJVal.children
-            results = (for (jObj <- rspList) yield jObj.extract[T])
+            for (jObj <- rspList) yield jObj.extract[T]
         } else {
-            results = List(rspJVal.extract[T])
-        }
-        val allResults = previousResults ::: results
-        if (maxPagesVar > 1 && pageNum < maxPagesVar) {
-            getData(path, responseIsArray, allResults, pageNum + 1, maxPagesVar)
-        } else {
-            allResults
+            List(rspJVal.extract[T])
         }
     }
+
 
 }
