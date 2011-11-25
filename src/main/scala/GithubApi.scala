@@ -3,9 +3,13 @@
  */
 
 import dispatch._
-import java.util.Random
 import net.liftweb.json._
 import scala.actors.Actor._
+
+/**
+ * Base class for Github data, nothing in this class, simply used to restrict
+ * types sent to functions
+ */
 class GithubClass
 
 /**
@@ -102,12 +106,12 @@ class GithubApi {
         h.shutdown()
         var results = parseResults[T](rspStr, responseIsArray)
         if (responseIsArray && maxPage > 1) {
-            for(i <- 2 until maxPage) {
+            for(i <- 2 until maxPage+1) {
                 actor {
                     caller ! getSinglePage[T](path, i)
                 }
             }
-            for(i <- 2 until maxPage) {
+            for(i <- 2 until maxPage+1) {
                 receive {
                     case pageResults: List[T] => {
                         results = results ::: pageResults
