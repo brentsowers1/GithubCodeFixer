@@ -3,9 +3,9 @@
  */
 
 import dispatch._
+import java.util.Random
 import net.liftweb.json._
 import scala.actors.Actor._
-
 class GithubClass
 
 /**
@@ -59,6 +59,10 @@ class GithubApi {
         getData[Repo]("users/" + user + "/repos")
     }
 
+    /**
+     * Returns a list of User instances for users watching the passed in
+     * repo name.
+     */
     def repoWatchers(repoOwner: String,  repoName: String) : List[User] = {
         getData[User]("repos/" + repoOwner + "/" + repoName + "/watchers")
     }
@@ -73,20 +77,28 @@ class GithubApi {
         val req = url(strUrl)
         var maxPage = 1
         val caller = self
+        var rspStr = ""
+        var rateLimitHit = false
 
-        // To know if there are multiple pages, we have to make the first request
-        val rspStr = h(req >:+ { (headers, req) =>
-            // The first time we run this, look at the headers for what the last
-            // page is.
-            if (headers.contains("link") && headers("link").length > 0) {
-                val NextLinkPattern = """.*\?page=(\d+)>; rel="next", .*?page=(\d+)>; rel="last".*""".r
-                headers("link").head match {
-                    case NextLinkPattern(next, last) => maxPage = last.toInt
-                    case _ => {}
+        do {
+            // To know if there are multiple pages, we have to make the first request
+            rspStr = h(req >:+ { (headers, req) =>
+                rateLimitHit = isRateLimitExceeded(headers)
+                if (rateLimitHit) {
+                    Thread.sleep(15000)
                 }
-            }
-            req as_str
-        })
+                // The first time we run this, look at the headers for what the last
+                // page is.
+                if (!rateLimitHit && headers.contains("link") && headers("link").length > 0) {
+                    val NextLinkPattern = """.*\?page=(\d+)>; rel="next", .*?page=(\d+)>; rel="last".*""".r
+                    headers("link").head match {
+                        case NextLinkPattern(next, last) => maxPage = last.toInt
+                        case _ => {}
+                    }
+                }
+                req as_str
+            })
+        } while (rateLimitHit)
         h.shutdown()
         var results = parseResults[T](rspStr, responseIsArray)
         if (responseIsArray && maxPage > 1) {
@@ -106,19 +118,36 @@ class GithubApi {
         results
     }
 
+    /**
+     * Gets a single page of responses from Github of the type passed in.
+     */
     private def getSinglePage[T <: GithubClass : Manifest](path: String, pageNum: Int = 1) : List[T] = {
         val h = new Http
         var strUrl = baseUrl + "/" + path + "?page=" + pageNum.toString
         val req = url(strUrl)
+        var rateLimitHit = false
+        var rspStr = ""
 
-        // Gets both the headers and response body
-        val rspStr = h(req >:+ { (headers, req) =>
-            req as_str
-        })
+        do {
+            // Gets both the headers and response body
+            rspStr = h(req >:+ { (headers, req) =>
+                rateLimitHit = isRateLimitExceeded(headers)
+                if (rateLimitHit) {
+                    Thread.sleep(15000)
+                }
+                req as_str
+            })
+        } while (rateLimitHit)
         h.shutdown()
         parseResults[T](rspStr)
     }
 
+    /**
+     * Parses a string response from Github, converting it in to a list of instances
+     * of the class passed in.  responseIsArray determines whether the result string is
+     * expected to be a JSON array.  If not, then a list with a single
+     * item is returned.
+     */
     private def parseResults[T <: GithubClass : Manifest](resultData: String,
                                                           responseIsArray: Boolean = true) : List[T] = {
         val rspJVal = parse(resultData)
@@ -128,6 +157,17 @@ class GithubApi {
             for (jObj <- rspList) yield jObj.extract[T]
         } else {
             List(rspJVal.extract[T])
+        }
+    }
+
+    /**
+     * Returns whether or not the Github rate limit has been exceeded
+     */
+    private def isRateLimitExceeded(headers: Map[String,Seq[String]]) : Boolean = {
+        if (headers.contains("X-RateLimit-Remaining") && headers("X-RateLimit-Remaining").length > 0) {
+            headers("X-RateLimit-Remaining").head.toInt <= 10
+        } else {
+            false
         }
     }
 
