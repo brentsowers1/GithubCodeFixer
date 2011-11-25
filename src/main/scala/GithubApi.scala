@@ -78,7 +78,7 @@ class GithubApi {
                                                      responseIsArray: Boolean = true) : List[T] = {
         val h = new Http
         var strUrl = baseUrl + "/" + path
-        val req = url(strUrl)
+        val req = url(strUrl).as(Settings.getProperty("githubUsername"), Settings.getProperty("githubPassword"))
         var maxPage = 1
         val caller = self
         var rspStr = ""
@@ -128,7 +128,7 @@ class GithubApi {
     private def getSinglePage[T <: GithubClass : Manifest](path: String, pageNum: Int = 1) : List[T] = {
         val h = new Http
         var strUrl = baseUrl + "/" + path + "?page=" + pageNum.toString
-        val req = url(strUrl)
+        val req = url(strUrl).as(Settings.getProperty("githubUsername"), Settings.getProperty("githubPassword"))
         var rateLimitHit = false
         var rspStr = ""
 
