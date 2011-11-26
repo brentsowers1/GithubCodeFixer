@@ -78,8 +78,8 @@ class GithubApi {
     def createFork(repoOwner: String, repoName: String) : Boolean = {
         val rsp = getData[Repo]("repos/" + repoOwner + "/" + repoName + "/forks",
                                 false, "POST")
-        val x = rsp
-        true
+        val repo = rsp.head
+        repo.owner.login == Settings.getProperty("githubUsername")
     }
 
     /**
