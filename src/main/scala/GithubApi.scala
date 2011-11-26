@@ -99,35 +99,19 @@ class GithubApi {
                                                      responseIsArray: Boolean = true,
                                                      method: String = "GET",
                                                      formParams: Map[String,String] = null) : List[T] = {
-        val h = new Http
-        var strUrl = baseUrl + "/" + path
-        var req = url(strUrl).as_!(Settings.getProperty("githubUsername"), Settings.getProperty("githubPassword"))
-        req = attachMethodToRequest(req, method)
         var maxPage = 1
         val caller = self
-        var rspStr = ""
-        var rateLimitHit = false
 
-        do {
-            // To know if there are multiple pages, we have to make the first request
-            rspStr = h(req >:+ { (headers, req) =>
-                rateLimitHit = isRateLimitExceeded(headers)
-                if (rateLimitHit) {
-                    Thread.sleep(15000)
-                }
-                // The first time we run this, look at the headers for what the last
-                // page is.
-                if (!rateLimitHit && headers.contains("link") && headers("link").length > 0) {
-                    val NextLinkPattern = """.*\?page=(\d+)>; rel="next", .*?page=(\d+)>; rel="last".*""".r
-                    headers("link").head match {
-                        case NextLinkPattern(next, last) => maxPage = last.toInt
-                        case _ => {}
-                    }
-                }
-                req as_str
-            })
-        } while (rateLimitHit)
-        h.shutdown()
+        val (headers, rspStr) = makeSingleRequest(path, method)
+
+        if (headers.contains("link") && headers("link").length > 0) {
+            val NextLinkPattern = """.*\?page=(\d+)>; rel="next", .*?page=(\d+)>; rel="last".*""".r
+            headers("link").head match {
+                case NextLinkPattern(next, last) => maxPage = last.toInt
+                case _ => {}
+            }
+        }
+
         var results = parseResults[T](rspStr, responseIsArray)
         if (responseIsArray && maxPage > 1) {
             for(i <- 2 until maxPage+1) {
@@ -150,24 +134,38 @@ class GithubApi {
      * Gets a single page of responses from Github of the type passed in.
      */
     private def getSinglePage[T <: GithubClass : Manifest](path: String, pageNum: Int = 1) : List[T] = {
+        val pathWithPage = path + "?page=" + pageNum.toString
+        val (headers, rspStr) = makeSingleRequest(pathWithPage)
+        parseResults[T](rspStr)
+    }
+
+    /**
+     * Makes a single HTTP request, returning a tuple with the headers first and the
+     * response as a string next.  The rate limit will be checked and the request
+     * tried again after sleeping if the rate limit was hit.
+     */
+    private def makeSingleRequest(path: String, method: String = "GET") : (Map[String,Seq[String]], String) = {
         val h = new Http
-        var strUrl = baseUrl + "/" + path + "?page=" + pageNum.toString
-        val req = url(strUrl).as(Settings.getProperty("githubUsername"), Settings.getProperty("githubPassword"))
+        var strUrl = baseUrl + "/" + path
+        val reqNoMethod = url(strUrl).as_!(Settings.getProperty("githubUsername"), Settings.getProperty("githubPassword"))
+        val req = attachMethodToRequest(reqNoMethod, method)
         var rateLimitHit = false
         var rspStr = ""
+        var headers = Map[String, Seq[String]]()
 
         do {
             // Gets both the headers and response body
-            rspStr = h(req >:+ { (headers, req) =>
-                rateLimitHit = isRateLimitExceeded(headers)
+            rspStr = h(req >:+ { (hdrs, req) =>
+                rateLimitHit = isRateLimitExceeded(hdrs)
                 if (rateLimitHit) {
                     Thread.sleep(15000)
                 }
+                headers = hdrs
                 req as_str
             })
         } while (rateLimitHit)
         h.shutdown()
-        parseResults[T](rspStr)
+        (headers,rspStr)
     }
 
     /**
