@@ -72,13 +72,27 @@ class GithubApi {
     }
 
     /**
+     * Creates a fork of the repo specified. This fork is placed in the logged
+     * in user's list of repositories
+     */
+    def createFork(repoOwner: String, repoName: String) : Boolean = {
+        val rsp = getData[Repo]("repos/" + repoOwner + "/" + repoName + "/forks",
+                                false, "POST")
+        val x = rsp
+        true
+    }
+
+    /**
      * Makes an HTTP request to Github, and returns a list of the type passed in
      */
     private def getData[T <: GithubClass : Manifest](path: String,
-                                                     responseIsArray: Boolean = true) : List[T] = {
+                                                     responseIsArray: Boolean = true,
+                                                     method: String = "GET",
+                                                     formParams: Map[String,String] = null) : List[T] = {
         val h = new Http
         var strUrl = baseUrl + "/" + path
-        val req = url(strUrl).as(Settings.getProperty("githubUsername"), Settings.getProperty("githubPassword"))
+        var req = url(strUrl).as_!(Settings.getProperty("githubUsername"), Settings.getProperty("githubPassword"))
+        req = attachMethodToRequest(req, method)
         var maxPage = 1
         val caller = self
         var rspStr = ""
@@ -172,6 +186,15 @@ class GithubApi {
             headers("X-RateLimit-Remaining").head.toInt <= 10
         } else {
             false
+        }
+    }
+
+    private def attachMethodToRequest(request: Request, method: String) : Request = {
+        method match {
+            case "POST"   => request.POST
+            case "PUT"    => request.PUT
+            case "DELETE" => request.DELETE
+            case _        => request
         }
     }
 

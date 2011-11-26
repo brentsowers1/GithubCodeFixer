@@ -12,6 +12,8 @@ object GithubCodeFixer {
             println("Size:        " + repo.size + "\n")
         }
 
+        val forked = gh.createFork("brentsowers1", "GithubCodeFixer")
+
 //        val watchers = gh.repoWatchers("rails", "rails")
 //        val watchersStr = for (watcher <- watchers) yield watcher.login
 //        print("Number of watchers: " + watchers.length.toString + "\n\n")
