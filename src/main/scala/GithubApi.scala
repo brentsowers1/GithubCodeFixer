@@ -34,7 +34,7 @@ case class Repo(url: String,                // URL to get JSON for this repo via
                 name: String,               // name of this repository
                 description: String,        // optional description of this repo
                 homepage: String,           // optional URL of the home page for this project (not necessarily github)
-                language: String,           // optional programming language
+                language: String,           // optional primary programming language
                 `private`: Boolean,         // true/false for whether this is a private repo
                 fork: Boolean,              // true if this was forked from another repo
                 forks: Int,                 // number of forks made from this repo
@@ -42,7 +42,9 @@ case class Repo(url: String,                // URL to get JSON for this repo via
                 size: Int,                  // number of lines of code?
                 open_issues: Int,           // number of open issues?
                 pushed_at: java.util.Date,  // last time repo was pushed to
-                created_at: java.util.Date) // when the repo was created
+                created_at: java.util.Date, // when the repo was created
+                parent: Option[Repo]        // If this repo was forked, and you requested details on a specific repo (instead of a list of repos), this is the repo that it was forked from
+                )
     extends GithubClass
 
 class GithubApi {
@@ -61,6 +63,14 @@ class GithubApi {
      */
     def reposByUser(user: String) : List[Repo] = {
         getData[Repo]("users/" + user + "/repos")
+    }
+
+    /**
+     * Returns full details on a specific repo
+     */
+    def repoDetails(user: String, repo: String) : Repo = {
+        val repoList = getData[Repo]("repos/" + user + "/" + repo,  false)
+        repoList.head
     }
 
     /**
