@@ -92,6 +92,12 @@ class GithubApi {
         repo.owner.login == Settings.getProperty("githubUsername")
     }
 
+    def getLanguages(repoOwner: String, repoName: String) : Map[String, Int] = {
+        val (headers, rspStr) = makeSingleRequest("repos/" + repoOwner + "/" + repoName + "/languages")
+        val rspJVal = parse(rspStr)
+        rspJVal.values.asInstanceOf[Map[String,Int]]
+    }
+
     /**
      * Makes an HTTP request to Github, and returns a list of the type passed in
      */

@@ -12,13 +12,18 @@ object GithubCodeFixer {
             println("Size:        " + repo.size + "\n")
         }
 
+        val languages = gh.getLanguages("rails", "rails")
+        for ((language, numLines) <- languages) {
+            println("(" + numLines.toString + ") " + language)
+        }
+
 //        val forked = gh.createFork("brentsowers1", "GithubCodeFixer")
 //        println("Forked? " + forked.toString)
-
+//
 //        val watchers = gh.repoWatchers("rails", "rails")
 //        val watchersStr = for (watcher <- watchers) yield watcher.login
 //        print("Number of watchers: " + watchers.length.toString + "\n\n")
-
+//
 //        val details = gh.repoDetails("brentsowers1", "GithubCodeFixer")
 //        details.parent match {
 //            case Some(repo) => println("Parent repo owner is " + repo.owner.login)
