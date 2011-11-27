@@ -1,3 +1,4 @@
+package com.coordinatecommons.GithubCodeFixer
 /**
  * Class for retrieving data from Github
  */

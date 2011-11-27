@@ -1,3 +1,4 @@
+package com.coordinatecommons.GithubCodeFixer
 /**
  * Examples of how to use the GithubApi class. To use these, you'll have to
  * either edit Settings.scala and set your Github user name and password,
