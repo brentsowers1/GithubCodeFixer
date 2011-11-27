@@ -4,6 +4,7 @@
 
 import dispatch._
 import net.liftweb.json._
+import net.liftweb.json.Serialization.{read, write}
 import scala.actors.Actor._
 
 /**
@@ -45,6 +46,34 @@ case class Repo(url: String,                // URL to get JSON for this repo via
                 created_at: java.util.Date, // when the repo was created
                 parent: Option[Repo]        // If this repo was forked, and you requested details on a specific repo (instead of a list of repos), this is the repo that it was forked from
                 )
+    extends GithubClass
+
+case class Link(href: String)
+
+case class PullRequestLinks(self: Link,           // API url to this request
+                            html: Link,           // URL to view this pull request
+                            comments: Link,       // API URL to view comments
+                            review_comments: Link // API URL to view the review comments
+                            )
+
+/**
+ * A single pull request
+ */
+case class PullRequest(url : String,                       // API URL for this request
+                       html_url: String,                   // URL to view this request
+                       diff_url: String,                   // URL to view the diff
+                       patch_url: String,                  // URL to view the patch
+                       issue_url: String,                  // URL to view this as an issue
+                       number: Int,                        // Sequential pull request number for the repo
+                       state: String,                      // "open", (not sure what else this can be)
+                       title: String,                      // title for this request
+                       body: String,                       // long description of the request
+                       created_at: java.util.Date,         // When the request was created
+                       updated_at: java.util.Date,         // When it was last updated
+                       closed_at: Option[java.util.Date],  // When it was closed
+                       merged_at: Option[java.util.Date],  // WHen it was merged in
+                       _links: PullRequestLinks            // More links
+                      )
     extends GithubClass
 
 class GithubApi {
@@ -92,10 +121,41 @@ class GithubApi {
         repo.owner.login == Settings.getProperty("githubUsername")
     }
 
+    /**
+     * Gets all languages in this repo, and the number of lines for each language.  For
+     * example, rails/rails will return something like:
+     * ("Ruby" -> 7000000,
+     *  "CoffeeScript" -> 750,
+     *  "Javascript" -> 75000)
+     */
     def getLanguages(repoOwner: String, repoName: String) : Map[String, Int] = {
         val (headers, rspStr) = makeSingleRequest("repos/" + repoOwner + "/" + repoName + "/languages")
         val rspJVal = parse(rspStr)
         rspJVal.values.asInstanceOf[Map[String,Int]]
+    }
+
+    /**
+     * Creates a new request to pull your (user with the login credentials specified
+     * in Settings) changes back in to the original repo.
+     * @param repoOwner User name of the repo to request to
+     * @param repoName Name of the repo to request the pull in to
+     * @param title A short title for this request
+     * @param body A longer description of the request
+     * @param destinationBase Either a git ref or a branch of repoName that you want
+     *                 your changes pulled in to (typically master)
+     * @param sourceHead either a git ref or the branch name of the location of
+     *                   your changes.
+     */
+    def createPullRequest(repoOwner: String, repoName: String,
+                          title: String, body: String,
+                          destinationBase: String, sourceHead: String) : PullRequest = {
+        val params = Map("title" -> title,
+                         "body" -> body,
+                         "base" -> destinationBase,
+                         "head" -> (Settings.getProperty("githubUsername") + ":" + sourceHead))
+        val rsp = getData[PullRequest]("repos/" + repoOwner + "/" + repoName + "/pulls",
+                                       false, "POST", Option(params))
+        rsp.head
     }
 
     /**
@@ -104,11 +164,11 @@ class GithubApi {
     private def getData[T <: GithubClass : Manifest](path: String,
                                                      responseIsArray: Boolean = true,
                                                      method: String = "GET",
-                                                     formParams: Map[String,String] = null) : List[T] = {
+                                                     params: Option[Map[String,String]] = None) : List[T] = {
         var maxPage = 1
         val caller = self
 
-        val (headers, rspStr) = makeSingleRequest(path, method)
+        val (headers, rspStr) = makeSingleRequest(path, method, params)
 
         if (headers.contains("link") && headers("link").length > 0) {
             val NextLinkPattern = """.*\?page=(\d+)>; rel="next", .*?page=(\d+)>; rel="last".*""".r
@@ -150,11 +210,18 @@ class GithubApi {
      * response as a string next.  The rate limit will be checked and the request
      * tried again after sleeping if the rate limit was hit.
      */
-    private def makeSingleRequest(path: String, method: String = "GET") : (Map[String,Seq[String]], String) = {
+    private def makeSingleRequest(path: String,
+                                  method: String = "GET",
+                                  params: Option[Map[String,String]] = None) : (Map[String,Seq[String]], String) = {
         val h = new Http
-        var strUrl = baseUrl + "/" + path
-        val reqNoMethod = url(strUrl).as_!(Settings.getProperty("githubUsername"), Settings.getProperty("githubPassword"))
-        val req = attachMethodToRequest(reqNoMethod, method)
+        val strUrl = baseUrl + "/" + path
+        var req = url(strUrl).as_!(Settings.getProperty("githubUsername"), Settings.getProperty("githubPassword"))
+        if (params.isDefined) {
+            val paramsStr = write(params.get)
+            req = req <<(paramsStr, "application/json")
+        } else {
+            req = attachMethodToRequest(req, method)
+        }
         var rateLimitHit = false
         var rspStr = ""
         var headers = Map[String, Seq[String]]()
