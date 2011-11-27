@@ -15,7 +15,7 @@ object Settings {
         "githubPassword" -> "Put your github password here",
 
         // Location that repos will be clone in to as they are being worked on
-        "workingDirectory" -> System.getProperty("user.dir")
+        "workingDirectory" -> (System.getProperty("user.dir") + "/working")
     )
 
     def getProperty(name : String) = {

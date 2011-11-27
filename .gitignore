@@ -7,4 +7,5 @@ target
 project/build/target
 project/boot
 *.iml
+working/*
 
