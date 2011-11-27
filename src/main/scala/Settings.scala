@@ -12,7 +12,10 @@ object Settings {
         "githubUsername" -> "Put your github user name here",
 
         // Password of the user name from above
-        "githubPassword" -> "Put your github password here"
+        "githubPassword" -> "Put your github password here",
+
+        // Location that repos will be clone in to as they are being worked on
+        "workingDirectory" -> System.getProperty("user.dir")
     )
 
     def getProperty(name : String) = {
