@@ -6,7 +6,7 @@ package com.coordinatecommons.GithubCodeFixer.CodeFixes
 
 abstract class CodeFix() {
     // Set this to the programming language that your class fixes
-    abstract val language: String = ""
+    val language: String = ""
 
     // Implement this function to fix the code passed in. The program will
     // read an entire file and send the data for the file in. You return the
@@ -31,6 +31,6 @@ abstract class CodeFix() {
     // Note that your class is only instantiated once per project. So you can
     // do things like read a project settings file once on the first call to
     // fix code and use the settings on every subsequent call
-    abstract def fixCode(fileData: String, projectPath: String,  fileName: String) : String
+    def fixCode(fileData: String, projectPath: String,  fileName: String) : String
 
 }
