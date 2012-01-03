@@ -36,7 +36,7 @@ object GithubCodeFixer {
                 println("Committed changes")
                 r.pushRemote(branchName)
                 println("Pushed changes to " + Settings.getProperty("githubUsername") + "/" + repoName)
-                api.createPullRequest(Settings.getProperty("githubUsername"), repoName,
+                api.createPullRequest(repoOwner, repoName,
                     "Automatic deprecation fixes by GithubCodeFixer",
                     "The open source project GithubCodeFixer (https://github.com/brentsowers1/GithubCodeFixer) has scanned your code and automatically made some fixes:\n" +
                     "   Some of the Rails 3 deprecated functions in your code have been fixed so that your code will work with Rails 3.1\n" +
