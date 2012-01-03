@@ -115,11 +115,10 @@ class GithubApi {
      * Creates a fork of the repo specified. This fork is placed in the logged
      * in user's list of repositories
      */
-    def createFork(repoOwner: String, repoName: String) : Boolean = {
+    def createFork(repoOwner: String, repoName: String) : Repo = {
         val rsp = getData[Repo]("repos/" + repoOwner + "/" + repoName + "/forks",
                                 false, "POST")
-        val repo = rsp.head
-        repo.owner.login == Settings.getProperty("githubUsername")
+        rsp.head
     }
 
     /**
