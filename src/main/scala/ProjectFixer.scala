@@ -5,13 +5,14 @@ class ProjectFixer {
 
     /**
      * Runs through every file in the directory specified and applies all fixes
-     * provided in the CodeFixes folder.  Returns whether or not any fixes were
-     * actually applied.
+     * provided in the CodeFixes folder.  Returns a list of the names of files
+     * that were modified, The list is empty if no files were modified
      */
-    def fixProject(baseDirectory: String) : Boolean = {
+    def fixProject(baseDirectory: String) : List[String] = {
         var fixed = false
         val baseFile = new File(baseDirectory)
         val files = _recursiveListFiles(baseFile)
+        var filesModified : List[String] = List();
         files.foreach(f => {
             val name = f.getName
             println("Got name " + name)
@@ -34,6 +35,7 @@ class ProjectFixer {
                                     println("---- ---- Fix made, about to write file")
                                     fixed = true
                                     _writeFile(f, outData)
+                                    filesModified = f.getAbsolutePath :: filesModified
                                     println("---- ---- New file written")
                                 }
                             }
@@ -44,7 +46,7 @@ class ProjectFixer {
                 case _ => { }
             }
         })
-        fixed
+        filesModified
     }
 
     def _recursiveListFiles(f: File): Array[File] = {
