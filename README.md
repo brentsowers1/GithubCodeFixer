@@ -15,7 +15,7 @@ Running the code
 ----------------
 
 This project is written in Scala with SBT to do the building.  To run this, follow the steps at
-my blog post: http://scalalift.brentsowers.com/2010/10/starting-lift-project-with-sbt-and.html.
+my blog post: http://scalalift.brentsowers.com/2011/10/starting-lift-project-with-sbt-and.html.
 Follow the Scala and SBT steps, you don't need to do anything after that.  Then in the directory
 that contains this code, type sbt, then at the prompt type update followed by reload followed by
 run.
